@@ -2,6 +2,8 @@
 
 A simple Python-based backtesting engine for evaluating stock trading strategies using historical market data.
 
+Live Demo: https://stockbacktester-1998.streamlit.app/
+
 The project is designed to deepen understanding of:
 
 - Financial returns
