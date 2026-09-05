@@ -85,29 +85,11 @@ def calculate_volatility(
         * np.sqrt(periods_per_year)
     )
 
-
 def calculate_sharpe_ratio(
     returns,
     risk_free_rate=0.02,
     periods_per_year=TRADING_DAYS
 ):
-    """
-    Calculate annualized Sharpe ratio.
-
-    Parameters
-    ----------
-    returns : pandas.Series
-        Daily strategy returns.
-
-    risk_free_rate : float
-        Annual risk-free rate.
-        Default = 2%.
-
-    periods_per_year : int
-        Number of trading periods per year.
-        Default = 252.
-    """
-
     returns = returns.dropna()
 
     if len(returns) < 2:
@@ -126,7 +108,31 @@ def calculate_sharpe_ratio(
 
     volatility = excess_returns.std()
 
-    if volatility == 0:
+    # Zero volatility means the Sharpe ratio
+    # is mathematically undefined.
+    #
+    # If returns are positive, we represent this
+    # as positive infinity.
+    #
+    # If returns are negative, we represent this
+    # as negative infinity.
+    #
+    # If returns equal the risk-free rate exactly,
+    # the excess return is zero and the Sharpe ratio
+    # remains undefined.
+
+    if np.isclose(volatility, 0):
+
+        mean_excess_return = (
+            excess_returns.mean()
+        )
+
+        if mean_excess_return > 0:
+            return np.inf
+
+        if mean_excess_return < 0:
+            return -np.inf
+
         return np.nan
 
     return (
@@ -134,7 +140,6 @@ def calculate_sharpe_ratio(
         / volatility
         * np.sqrt(periods_per_year)
     )
-
 
 def calculate_max_drawdown(returns):
     """

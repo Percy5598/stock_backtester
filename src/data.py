@@ -15,8 +15,7 @@ def get_stock_data(
         Stock ticker symbol, e.g. "AAPL".
 
     period : str
-        Yahoo Finance period, e.g.
-        "1y", "2y", "5y", "max".
+        Yahoo Finance period.
 
     Returns
     -------
@@ -43,26 +42,16 @@ def get_stock_data(
             f"No data found for {ticker}."
         )
 
-    # --------------------------------------------------
     # Handle yfinance MultiIndex columns
-    # --------------------------------------------------
-
     if isinstance(
         data.columns,
         pd.MultiIndex
     ):
 
-        # For a single ticker, remove the
-        # ticker level from the columns.
         data.columns = (
             data.columns
             .get_level_values(0)
         )
-
-    # --------------------------------------------------
-    # Keep only the columns needed by the
-    # backtesting project.
-    # --------------------------------------------------
 
     required_columns = [
         "Open",
@@ -82,25 +71,9 @@ def get_stock_data(
         available_columns
     ].copy()
 
-    # --------------------------------------------------
-    # Clean the data
-    # --------------------------------------------------
-
     data = data.sort_index()
 
-    data = data.dropna(
-        subset=["Close"]
-    )
-
-    # Make sure Volume is numeric
-    if "Volume" in data.columns:
-
-        data["Volume"] = pd.to_numeric(
-            data["Volume"],
-            errors="coerce"
-        )
-
-    # Make sure prices are numeric
+    # Make prices numeric
     price_columns = [
         "Open",
         "High",
@@ -117,6 +90,14 @@ def get_stock_data(
                 errors="coerce"
             )
 
+    # Make volume numeric
+    if "Volume" in data.columns:
+
+        data["Volume"] = pd.to_numeric(
+            data["Volume"],
+            errors="coerce"
+        )
+
     data = data.dropna(
         subset=["Close"]
     )
@@ -129,8 +110,7 @@ def get_close_prices(
     period="5y"
 ):
     """
-    Download only the closing prices
-    for a stock.
+    Download only closing prices.
 
     Returns
     -------
@@ -142,7 +122,19 @@ def get_close_prices(
         period
     )
 
-    return data["Close"]
+    prices = data["Close"]
+
+    # Safety check for yfinance
+    if isinstance(
+        prices,
+        pd.DataFrame
+    ):
+
+        prices = prices.iloc[:, 0]
+
+    prices.name = ticker.upper().strip()
+
+    return prices
 
 
 def get_multiple_stocks(
@@ -150,7 +142,8 @@ def get_multiple_stocks(
     period="5y"
 ):
     """
-    Download data for multiple stocks.
+    Download historical data for
+    multiple stocks.
 
     Parameters
     ----------
@@ -158,15 +151,29 @@ def get_multiple_stocks(
         Example:
         ["AAPL", "MSFT", "NVDA"]
 
+    period : str
+        Yahoo Finance period.
+
     Returns
     -------
     dict
-        Dictionary containing DataFrames.
+        Dictionary:
+
+        {
+            "AAPL": DataFrame,
+            "MSFT": DataFrame,
+            "NVDA": DataFrame
+        }
     """
 
     stock_data = {}
 
     for ticker in tickers:
+
+        ticker = ticker.upper().strip()
+
+        if not ticker:
+            continue
 
         try:
 

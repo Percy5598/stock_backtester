@@ -2,129 +2,157 @@ import pandas as pd
 
 from src.backtest import run_backtest
 from src.metrics import calculate_metrics
-from src.strategies import (
-    buy_and_hold_strategy,
-    moving_average_strategy,
-    moving_average_crossover_strategy,
-    momentum_strategy,
-)
+from src.strategies import get_strategy
 
 
 def compare_strategies(
     prices,
-    initial_capital=10_000
+    initial_capital=10_000,
+    strategies=None,
+    strategy_parameters=None,
 ):
     """
-    Run multiple trading strategies on the
-    same price data and compare their performance.
-
-    Parameters
-    ----------
-    prices : pandas.Series
-        Historical closing prices.
-
-    initial_capital : float
-        Starting portfolio value.
-
-    Returns
-    -------
-    pandas.DataFrame
-        Comparison of strategy performance.
+    Run selected strategies on one stock.
     """
 
     if prices.empty:
-        raise ValueError(
-            "Prices cannot be empty."
-        )
+        raise ValueError("Prices cannot be empty.")
 
-    strategies = {
-        "Buy & Hold": (
-            buy_and_hold_strategy(prices)
-        ),
+    if strategies is None:
+        strategies = [
+            "buy_and_hold",
+            "moving_average",
+            "moving_average_crossover",
+            "momentum",
+        ]
 
-        "Moving Average": (
-            moving_average_strategy(
-                prices,
-                window=20
-            )
-        ),
-
-        "MA Crossover": (
-            moving_average_crossover_strategy(
-                prices,
-                short_window=20,
-                long_window=50
-            )
-        ),
-
-        "Momentum": (
-            momentum_strategy(
-                prices,
-                lookback=20
-            )
-        ),
-    }
+    if strategy_parameters is None:
+        strategy_parameters = {}
 
     comparison = []
+    backtest_results = {}
 
-    for name, signals in strategies.items():
+    for strategy_name in strategies:
 
-        # Run the backtest
+        parameters = strategy_parameters.get(
+            strategy_name,
+            {}
+        )
+
+        signals = get_strategy(
+            strategy_name,
+            prices,
+            **parameters
+        )
+
         results = run_backtest(
             prices,
             signals,
-            initial_capital=initial_capital
+            initial_capital=initial_capital,
         )
 
-        # Calculate metrics
+        backtest_results[strategy_name] = results
+
         metrics = calculate_metrics(
             results["Strategy Return"]
         )
 
-        # Final portfolio value
         final_value = (
-            results["Portfolio Value"]
-            .iloc[-1]
+            results["Portfolio Value"].iloc[-1]
         )
 
         comparison.append(
             {
-                "Strategy": name,
-
-                "Total Return":
-                    metrics["Total Return"],
-
-                "Annualized Return":
-                    metrics["Annualized Return"],
-
-                "Volatility":
-                    metrics["Volatility"],
-
-                "Sharpe Ratio":
-                    metrics["Sharpe Ratio"],
-
-                "Maximum Drawdown":
-                    metrics["Maximum Drawdown"],
-
-                "Win Rate":
-                    metrics["Win Rate"],
-
-                "Final Portfolio Value":
-                    final_value,
+                "Strategy": strategy_name,
+                "Total Return": metrics["Total Return"],
+                "Annualized Return": metrics["Annualized Return"],
+                "Volatility": metrics["Volatility"],
+                "Sharpe Ratio": metrics["Sharpe Ratio"],
+                "Maximum Drawdown": metrics["Maximum Drawdown"],
+                "Win Rate": metrics["Win Rate"],
+                "Final Portfolio Value": final_value,
             }
         )
 
-    return pd.DataFrame(
-        comparison
+    comparison = pd.DataFrame(comparison)
+
+    return comparison, backtest_results
+
+
+def compare_multiple_stocks(
+    stock_prices,
+    initial_capital=10_000,
+    strategies=None,
+    strategy_parameters=None,
+):
+    """
+    Run selected strategies across multiple stocks.
+
+    Parameters
+    ----------
+    stock_prices : dict
+        Example:
+        {
+            "AAPL": prices,
+            "MSFT": prices,
+            "NVDA": prices
+        }
+
+    Returns
+    -------
+    comparison : pandas.DataFrame
+    backtest_results : dict
+    """
+
+    if not stock_prices:
+        raise ValueError(
+            "Stock prices cannot be empty."
+        )
+
+    all_comparisons = {}
+    all_backtest_results = {}
+
+    for ticker, prices in stock_prices.items():
+
+        if prices.empty:
+            continue
+
+        comparison, results = compare_strategies(
+            prices,
+            initial_capital=initial_capital,
+            strategies=strategies,
+            strategy_parameters=strategy_parameters,
+        )
+
+        comparison.insert(
+            0,
+            "Ticker",
+            ticker
+        )
+
+        all_comparisons[ticker] = comparison
+
+        all_backtest_results[ticker] = results
+
+    if not all_comparisons:
+        raise ValueError(
+            "No valid stock data available."
+        )
+
+    comparison_df = pd.concat(
+        all_comparisons.values(),
+        ignore_index=True
+    )
+
+    return (
+        comparison_df,
+        all_backtest_results
     )
 
 
-def print_comparison(
-    comparison
-):
+def format_comparison(comparison):
     """
-    Print strategy comparison in a
-    readable format.
+    Format comparison results for display.
     """
 
     display = comparison.copy()
@@ -139,24 +167,42 @@ def print_comparison(
 
     for column in percentage_columns:
 
-        display[column] = (
-            display[column] * 100
-        ).round(2)
+        if column in display.columns:
 
-    display["Sharpe Ratio"] = (
-        display["Sharpe Ratio"]
-        .round(2)
-    )
+            display[column] = (
+                display[column] * 100
+            ).round(2)
 
-    display["Final Portfolio Value"] = (
-        display["Final Portfolio Value"]
-        .round(2)
+    if "Sharpe Ratio" in display.columns:
+
+        display["Sharpe Ratio"] = (
+            display["Sharpe Ratio"]
+            .round(2)
+        )
+
+    if "Final Portfolio Value" in display.columns:
+
+        display["Final Portfolio Value"] = (
+            display["Final Portfolio Value"]
+            .round(2)
+        )
+
+    return display
+
+
+def print_comparison(comparison):
+    """
+    Print comparison results.
+    """
+
+    display = format_comparison(
+        comparison
     )
 
     print()
-    print("=" * 80)
+    print("=" * 100)
     print("STRATEGY COMPARISON")
-    print("=" * 80)
+    print("=" * 100)
 
     print(
         display.to_string(
@@ -164,4 +210,4 @@ def print_comparison(
         )
     )
 
-    print("=" * 80)
+    print("=" * 100)

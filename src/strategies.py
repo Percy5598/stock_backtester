@@ -33,20 +33,6 @@ def moving_average_strategy(
     Rule:
         Price > moving average -> 1
         Price <= moving average -> 0
-
-    Parameters
-    ----------
-    prices : pandas.Series
-        Historical closing prices.
-
-    window : int
-        Moving-average window.
-        Default = 20 trading days.
-
-    Returns
-    -------
-    pandas.Series
-        Trading signals.
     """
 
     if prices.empty:
@@ -60,9 +46,7 @@ def moving_average_strategy(
         )
 
     moving_average = (
-        prices
-        .rolling(window)
-        .mean()
+        prices.rolling(window).mean()
     )
 
     signals = (
@@ -85,25 +69,6 @@ def moving_average_crossover_strategy(
     Rule:
         Short MA > Long MA -> 1
         Short MA <= Long MA -> 0
-
-    Example:
-        20-day MA vs 50-day MA.
-
-    Parameters
-    ----------
-    prices : pandas.Series
-        Historical closing prices.
-
-    short_window : int
-        Short moving-average window.
-
-    long_window : int
-        Long moving-average window.
-
-    Returns
-    -------
-    pandas.Series
-        Trading signals.
     """
 
     if prices.empty:
@@ -128,15 +93,11 @@ def moving_average_crossover_strategy(
         )
 
     short_ma = (
-        prices
-        .rolling(short_window)
-        .mean()
+        prices.rolling(short_window).mean()
     )
 
     long_ma = (
-        prices
-        .rolling(long_window)
-        .mean()
+        prices.rolling(long_window).mean()
     )
 
     signals = (
@@ -158,10 +119,6 @@ def momentum_strategy(
     Rule:
         Positive lookback return -> 1
         Negative lookback return -> 0
-
-    Example:
-        If the stock increased over the
-        previous 20 trading days, stay invested.
     """
 
     if prices.empty:
@@ -174,10 +131,8 @@ def momentum_strategy(
             "Lookback must be greater than zero."
         )
 
-    momentum = (
-        prices.pct_change(
-            periods=lookback
-        )
+    momentum = prices.pct_change(
+        periods=lookback
     )
 
     signals = (
@@ -191,17 +146,28 @@ def momentum_strategy(
 
 def get_strategy(
     strategy_name,
-    prices
+    prices,
+    **parameters
 ):
     """
-    Select a strategy by name.
+    Create a trading strategy using
+    the selected parameters.
 
-    Available strategies:
+    Parameters
+    ----------
+    strategy_name : str
+        Strategy identifier.
 
-        "buy_and_hold"
-        "moving_average"
-        "moving_average_crossover"
-        "momentum"
+    prices : pandas.Series
+        Historical closing prices.
+
+    parameters : dict
+        Strategy-specific parameters.
+
+    Returns
+    -------
+    pandas.Series
+        Trading signals.
     """
 
     if strategy_name == "buy_and_hold":
@@ -210,31 +176,48 @@ def get_strategy(
             prices
         )
 
-    elif strategy_name == "moving_average":
+    if strategy_name == "moving_average":
+
+        window = parameters.get(
+            "window",
+            20
+        )
 
         return moving_average_strategy(
             prices,
-            window=20
+            window=window
         )
 
-    elif strategy_name == "moving_average_crossover":
+    if strategy_name == "moving_average_crossover":
+
+        short_window = parameters.get(
+            "short_window",
+            20
+        )
+
+        long_window = parameters.get(
+            "long_window",
+            50
+        )
 
         return moving_average_crossover_strategy(
             prices,
-            short_window=20,
-            long_window=50
+            short_window=short_window,
+            long_window=long_window
         )
 
-    elif strategy_name == "momentum":
+    if strategy_name == "momentum":
+
+        lookback = parameters.get(
+            "lookback",
+            20
+        )
 
         return momentum_strategy(
             prices,
-            lookback=20
+            lookback=lookback
         )
 
-    else:
-
-        raise ValueError(
-            f"Unknown strategy: "
-            f"{strategy_name}"
-        )
+    raise ValueError(
+        f"Unknown strategy: {strategy_name}"
+    )
